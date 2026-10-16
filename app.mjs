@@ -32,21 +32,20 @@ function renderStats(){
   $('baseline-change').title=baseline.count?`共通施設：${nf.format(baseline.baseline)} → ${nf.format(baseline.current)}件`:'初年を選択中、または比較可能な数値がありません';
   const eligible=facilities.filter(f=>valueAt(f,state.mode,state.index,state.includeQuality)!==null),mappedTotal=eligible.filter(validCoordinate).reduce((a,f)=>a+valueAt(f,state.mode,state.index,state.includeQuality),0);
   const coveragePercent=s.total>0?(mappedTotal/s.total*100).toFixed(1)+'%':'—';
-  $('coverage-label').textContent=`対象 ${nf.format(facilities.length)}施設中、座標未取得 ${nf.format(s.unlocated)}施設。集計対象の分娩件数のうち地図に位置を示せる割合 ${coveragePercent}。数値集計には座標未取得も含みます。`;
+  $('coverage-label').textContent=`対象 ${nf.format(facilities.length)}施設／座標未取得 ${nf.format(s.unlocated)}施設。集計件数の${coveragePercent}に座標あり。座標未取得も数値集計に含む。`;
   $('map-count').textContent=`地図に表示 ${nf.format(s.locatedPositive)}施設 · 公表0件 ${nf.format(s.zero)}施設`;
-  if(state.includeQuality)showMessage('原報告の要確認値を含んでいます。極端な値も補正せず表示するため、棒が大きく伸びる場合があります。');
-  else if(fallback)showMessage('3D地図を利用できないため、2D地図で表示しています。施設と年の操作・集計は引き続き使えます。');
-  else if(s.locatedPositive===0)showMessage('この条件で地図に表示できる正の公表値がありません。地域・施設種別・年を変更できます。');
+  if(state.includeQuality)showMessage('要確認値を含む。原値は未補正。');
+  else if(fallback)showMessage('3D利用不可：2D表示。集計・年次操作は利用可能。');
+  else if(s.locatedPositive===0)showMessage('この条件に表示可能な正値・座標のある施設はありません。');
   else showMessage('');
 }
 
 function render(){
   if(!data)return;
   const year=years()[state.index];$('map-year').textContent=year;$('map-year-unit').textContent=state.mode==='annual'?'年度':'年6月';
-  $('period-kicker').textContent=state.mode==='annual'?'ANNUAL DATA':'JUNE ONLY';
   $('map-period').textContent=state.mode==='annual'?`${year}年4月—${year+1}年3月`:`${year}年6月の1か月分`;
-  $('map-scale').textContent=fallback?'2D：円の大きさが件数に応じます。小さい値は最小サイズ。':!state.threeD?'2D：施設の位置を表示。施設を選ぶと件数が見られます。':`高さ：1件＝${HEIGHT_FACTOR[state.mode]}m相当（表示上の倍率）。年を変えても固定。`;
-  $('timeline-note').textContent=state.mode==='monthly'?'6月の1か月分。原報告に大きな異常値があり、地域の実態変化は要検証。年間換算はしません。'+(state.includeQuality?' 要確認値も含む。':''):state.includeQuality?'要確認値を含む · 秘匿・未報告は除外':'公表値を表示 · 原報告要確認値は除外';
+  $('map-scale').textContent=fallback?'2D：円の大きさ＝件数（最小サイズあり）。':!state.threeD?'2D：施設位置。選択で件数表示。':`高さ：1件＝${HEIGHT_FACTOR[state.mode]}m相当（表示倍率・年次固定）。`;
+  $('timeline-note').textContent=state.mode==='monthly'?'6月単月・年間換算なし。原報告に大きな異常値あり。実態変化は要検証。'+(state.includeQuality?' 要確認値を含む。':''):state.includeQuality?'要確認値を含む · 秘匿・未報告は除外':'原報告要確認値は除外';
   $('timeline-note').classList.toggle('monthly-warning',state.mode==='monthly');
   $('year-range').max=years().length-1;$('year-range').value=state.index;$('year-range').setAttribute('aria-valuetext',periodLabel(year));
   $('year-ticks').replaceChildren();years().forEach((y,i)=>{const b=document.createElement('button');b.type='button';b.textContent=y;b.setAttribute('aria-label',periodLabel(y)+'を表示');b.setAttribute('aria-pressed',String(i===state.index));b.addEventListener('click',()=>{setPlaying(false);setIndex(i);});$('year-ticks').append(b);});
@@ -119,14 +118,14 @@ function focusRegion(){
 }
 
 function selectFacility(f,fly=true){state.selected=f;$('facility-detail').hidden=false;renderDetail();updateMap();if(fly&&validCoordinate(f)&&mapReady)map.flyTo({center:[f.lon,f.lat],zoom:Math.max(map.getZoom(),8.5),pitch:state.threeD?48:0,duration:reduced?0:900});}
-function renderSearch(){const q=$('facility-search').value.trim().normalize('NFKC').toLowerCase();$('search-results').replaceChildren();if(!q)return;const found=pool().filter(f=>f.name.normalize('NFKC').toLowerCase().includes(q));for(const f of found.slice(0,12)){const b=document.createElement('button');b.type='button';b.textContent=f.name;const small=document.createElement('small');small.textContent=f.pref+' · '+TYPE_LABEL[f.type]+(validCoordinate(f)?'':' · 座標未取得');b.append(small);b.addEventListener('click',()=>{selectFacility(f);$('search-results').replaceChildren();$('facility-search').value=f.name;});$('search-results').append(b);}if(!found.length){const p=document.createElement('p');p.className='micro muted';p.textContent='該当施設がありません。地域・施設種別の条件も確認できます。';$('search-results').append(p);}else if(found.length>12){const p=document.createElement('p');p.className='micro muted';p.textContent=`${nf.format(found.length)}件中、先頭12件。名称を追加すると絞り込めます。`;$('search-results').append(p);}}
+function renderSearch(){const q=$('facility-search').value.trim().normalize('NFKC').toLowerCase();$('search-results').replaceChildren();if(!q)return;const found=pool().filter(f=>f.name.normalize('NFKC').toLowerCase().includes(q));for(const f of found.slice(0,12)){const b=document.createElement('button');b.type='button';b.textContent=f.name;const small=document.createElement('small');small.textContent=f.pref+' · '+TYPE_LABEL[f.type]+(validCoordinate(f)?'':' · 座標未取得');b.append(small);b.addEventListener('click',()=>{selectFacility(f);$('search-results').replaceChildren();$('facility-search').value=f.name;});$('search-results').append(b);}if(!found.length){const p=document.createElement('p');p.className='micro muted';p.textContent='該当施設なし。';$('search-results').append(p);}else if(found.length>12){const p=document.createElement('p');p.className='micro muted';p.textContent=`${nf.format(found.length)}件中、先頭12件。`;$('search-results').append(p);}}
 
 function renderDetail(){
   const f=state.selected;if(!f){$('facility-detail').hidden=true;return;}
   const value=valueAt(f,state.mode,state.index,state.includeQuality),raw=f[state.mode]?.[state.index],flag=f[state.mode+'Flags']?.[state.index],status=f[state.mode+'Status']?.[state.index];
   $('detail-type').textContent=TYPE_LABEL[f.type]+' · '+f.pref;$('detail-name').textContent=f.name;$('detail-address').textContent=f.address||f.cityName||'住所の対応未取得';$('detail-value').textContent=safeNumber(value);$('detail-unit').textContent=periodLabel(years()[state.index])+' · 件';
-  $('detail-status').textContent=flag?'原報告要確認：'+flag+(state.includeQuality?'（原値を表示）':`（${safeNumber(raw)}件を表示・集計から除外）`):status==='suppressed'?'秘匿のため施設合計は不明。ゼロではありません。':value===null?'この期の公表数値はありません。':'公表数値'+(f.type==='hospital'?'（病棟合計）':'');
-  $('detail-location').textContent=validCoordinate(f)?'位置：2026年6月1日の公表座標。過去の移転は未追跡。':'座標未取得のため地図に配置していません。数値は地域集計に含めます。';
+  $('detail-status').textContent=flag?'原報告要確認：'+flag+(state.includeQuality?'（原値を表示）':`（${safeNumber(raw)}件を表示・集計から除外）`):status==='suppressed'?'秘匿：施設合計不明（ゼロではない）。':value===null?'この期の公表数値なし。':'公表数値'+(f.type==='hospital'?'（病棟合計）':'');
+  $('detail-location').textContent=validCoordinate(f)?'2026年6月1日の公表座標。移転未追跡。':'座標未取得：地図表示なし・数値集計には含む。';
   const values=years().map((_,i)=>valueAt(f,state.mode,i,state.includeQuality));const max=Math.max(1,...values.filter(v=>v!==null));const width=270,height=95,left=14,right=13,top=10,bottom=12;
   const x=i=>left+i*(width-left-right)/(values.length-1),y=v=>height-bottom-v/max*(height-top-bottom);
   let path='';values.forEach((v,i)=>{if(v===null)return;path+=(i>0&&values[i-1]!==null?'L':'M')+x(i)+','+y(v)+' ';});
@@ -144,7 +143,7 @@ function bind(){
   $('play').addEventListener('click',()=>setPlaying(!state.playing));$('year-range').addEventListener('input',()=>{setPlaying(false);setIndex(Number($('year-range').value));});document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('reset-map').addEventListener('click',()=>{state.pref='';$('pref').value='';render();focusRegion();});
   $('dimension').addEventListener('click',()=>{if(!mapReady)return;state.threeD=!state.threeD;$('dimension').textContent=state.threeD?'3D':'2D';$('dimension').setAttribute('aria-pressed',String(state.threeD));map.easeTo({pitch:state.threeD?48:0,bearing:state.threeD?-12:0,duration:reduced?0:600});map.setLayoutProperty('columns','visibility',state.threeD?'visible':'none');render();});
-  for(const id of ['about-button','sources-button'])$(id).addEventListener('click',()=>$('about-dialog').showModal());$('close-about').addEventListener('click',()=>$('about-dialog').close());$('about-dialog').addEventListener('click',event=>{if(event.target===$('about-dialog')){const r=$('about-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('about-dialog').close();}});
+  $('about-button').addEventListener('click',()=>$('about-dialog').showModal());$('close-about').addEventListener('click',()=>$('about-dialog').close());$('about-dialog').addEventListener('click',event=>{if(event.target===$('about-dialog')){const r=$('about-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('about-dialog').close();}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)setPlaying(false);});new ResizeObserver(()=>{if(fallback)drawFallback();else if(map)map.resize();}).observe($('map-stage')||document.querySelector('.map-stage'));
 }
 
@@ -155,6 +154,6 @@ async function boot(){
     if(!Array.isArray(data.facilities)||!data.annualYears?.length||!data.monthlyYears?.length)throw new Error('データ形式を確認できません');
     const prefs=[...new Set(data.facilities.map(f=>f.pref))].sort((a,b)=>{const code=p=>data.facilities.find(f=>f.pref===p)?.prefCode||p;return String(code(a)).localeCompare(String(code(b)));});
     for(const p of prefs){const o=document.createElement('option');o.value=p;o.textContent=p;$('pref').append(o);}bind();render();$('loading').hidden=true;initializeMap();
-  }catch(error){console.error(error);$('loading').replaceChildren();const p=document.createElement('strong');p.textContent='データを読み込めませんでした。通信状況を確認して再読み込みしてください。';const button=document.createElement('button');button.type='button';button.className='error-retry';button.textContent='再読み込み';button.addEventListener('click',()=>location.reload());$('loading').append(p,button);}
+  }catch(error){console.error(error);$('loading').replaceChildren();const p=document.createElement('strong');p.textContent='データ読み込み失敗。通信状況を確認してください。';const button=document.createElement('button');button.type='button';button.className='error-retry';button.textContent='再読み込み';button.addEventListener('click',()=>location.reload());$('loading').append(p,button);}
 }
 boot();
