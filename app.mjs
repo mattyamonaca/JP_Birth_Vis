@@ -85,7 +85,7 @@ function initializeMap(){
         map.on('mouseenter',layer,()=>{map.getCanvas().style.cursor='pointer';});map.on('mouseleave',layer,()=>{map.getCanvas().style.cursor='';if(popup){popup.remove();popup=null;}});
         map.on('mousemove',layer,event=>{const f=data.facilities.find(f=>f.id===event.features?.[0]?.properties.id);if(!f)return;if(popup)popup.remove();popup=new maplibregl.Popup({closeButton:false,closeOnClick:false,offset:12}).setLngLat(event.lngLat).setHTML(`<strong>${esc(f.name)}</strong><br>${esc(periodLabel(years()[state.index]))} · ${nf.format(valueAt(f,state.mode,state.index,state.includeQuality))}件`).addTo(map);});
       }
-      map.on('zoomend',updateMap);map.getCanvas().addEventListener('webglcontextlost',()=>activateFallback());updateMap();
+      fitJapan();map.on('zoomend',updateMap);map.getCanvas().addEventListener('webglcontextlost',()=>activateFallback());updateMap();
     });
     map.on('error',e=>{if(/webgl|context|unsupported/i.test(e.error?.message||''))activateFallback();});
   }catch(error){console.warn('3D map unavailable',error);activateFallback();}
@@ -114,9 +114,36 @@ function drawFallback(){
   host.replaceChildren(svg);const attribution=document.createElement('div');attribution.className='fallback-attribution';attribution.innerHTML='境界：<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> · 小さい値は最小サイズ';host.append(attribution);
 }
 
+// Fit actual coast/facility points, avoiding the empty corners of Japan's bounding box.
+function fitJapan(duration=0){
+  const options=fitOptions(0),host=document.querySelector('.map-stage'),padding=options.padding;
+  const width=host.clientWidth,height=host.clientHeight;
+  if(!width||!height)return;
+  const points=[];
+  const collect=coordinates=>{if(typeof coordinates[0]==='number')points.push(coordinates);else coordinates.forEach(collect);};
+  outline.features.forEach(feature=>collect(feature.geometry.coordinates));
+  data.facilities.filter(validCoordinate).forEach(f=>points.push([f.lon,f.lat]));
+  const camera=()=>({center:map.getCenter(),zoom:map.getZoom(),bearing:map.getBearing(),pitch:map.getPitch()});
+  const previous=camera(),targetX=(padding.left+width-padding.right)/2,targetY=(padding.top+height-padding.bottom)/2;
+  const box=()=>{const p=points.map(point=>map.project(point));return {left:Math.min(...p.map(v=>v.x)),right:Math.max(...p.map(v=>v.x)),top:Math.min(...p.map(v=>v.y)),bottom:Math.max(...p.map(v=>v.y))};};
+  map.fitBounds(JAPAN_BOUNDS,options);
+  // Reproject after each change because perspective does not scale uniformly.
+  for(let step=0;step<8;step++){
+    let b=box();
+    map.jumpTo({center:map.unproject([width/2+(b.left+b.right)/2-targetX,height/2+(b.top+b.bottom)/2-targetY])});
+    b=box();
+    const ratio=Math.min((width-padding.left-padding.right)/(b.right-b.left),(height-padding.top-padding.bottom)/(b.bottom-b.top))*0.97;
+    if(!Number.isFinite(ratio)||ratio<=0)break;
+    const delta=Math.max(-0.6,Math.min(0.6,Math.log2(ratio)*0.8));
+    map.jumpTo({zoom:Math.min(options.maxZoom,Math.max(2,map.getZoom()+delta))});
+  }
+  const fitted=camera();
+  if(duration){map.jumpTo(previous);map.easeTo({...fitted,duration});}
+}
+
 function focusRegion(duration=reduced?0:800){
   if(fallback){drawFallback();return;}if(!mapReady)return;
-  const positive=positiveVisible(),located=positive.length?positive:pool().filter(validCoordinate);if(!state.pref||!located.length){map.fitBounds(JAPAN_BOUNDS,fitOptions(duration));return;}
+  const positive=positiveVisible(),located=positive.length?positive:pool().filter(validCoordinate);if(!state.pref||!located.length){fitJapan(duration);return;}
   const bounds=new maplibregl.LngLatBounds();located.forEach(f=>bounds.extend([f.lon,f.lat]));map.fitBounds(bounds,{...fitOptions(duration),maxZoom:8.2});
 }
 
