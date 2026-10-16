@@ -73,3 +73,5 @@ python3 scripts/check-static.py
 `.github/workflows/pages.yml` はGitHub公式のPages Actionsを使用し、公開対象のファイルだけを `_site/` にまとめて配信します。README・検証スクリプト・Git情報は配信物に含めません。
 
 すべてのアプリ参照は相対パスで、`/JP_Birth_Vis/` のプロジェクトサイトに対応します。MapLibreのworkerは同梱スクリプトからBlobとして生成され、別ホストのworkerやルート絶対パスを要求しません。
+
+`app.mjs` 更新時は、`index.html` の読み込みURLの `v` も更新してください（ブラウザキャッシュ対策）。
