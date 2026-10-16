@@ -9,7 +9,10 @@ const pool=()=>filterFacilities(data.facilities,state);
 const periodLabel=(year,mode=state.mode)=>mode==='annual'?year+'年度':year+'年6月';
 const safeNumber=v=>v===null||v===undefined?'—':nf.format(v);
 const positiveVisible=()=>pool().filter(f=>validCoordinate(f)&&(valueAt(f,state.mode,state.index,state.includeQuality)??0)>0);
-const nationalZoom=()=>Math.max(3,Math.min(4.35,4.35+Math.log2(Math.min(document.querySelector('.map-stage').clientWidth/900,document.querySelector('.map-stage').clientHeight/600))));
+const JAPAN_BOUNDS=[[122.7,24],[146.2,45.8]];
+// Loose pan limits preserve room for portrait/landscape views of all Japanese islands.
+const PAN_BOUNDS=[[112,15],[160,54]];
+function fitOptions(duration=0){const host=document.querySelector('.map-stage');return {padding:{top:Math.min(85,host.clientHeight*0.16),bottom:35,left:Math.min(70,host.clientWidth*0.12),right:24},bearing:state.threeD?-12:0,pitch:state.threeD?48:0,maxZoom:5.2,duration};}
 
 function showMessage(message){$('map-message').textContent=message;$('map-message').hidden=!message;}
 function setPlaying(on){clearInterval(timer);timer=null;state.playing=on;$('play-label').textContent=on?'停止':'再生';$('play-icon').textContent=on?'Ⅱ':'▶';$('play').setAttribute('aria-label',on?'再生を一時停止':'年次変化を再生');if(on){if(state.index>=years().length-1)setIndex(0);timer=setInterval(()=>{if(state.index>=years().length-1){setPlaying(false);return;}setIndex(state.index+1);},1500);}}
@@ -66,7 +69,7 @@ function updateMap(){
 function initializeMap(){
   if(!window.maplibregl){activateFallback();return;}
   try{
-    map=new maplibregl.Map({container:'map',center:[137.2,36.6],zoom:nationalZoom(),pitch:48,bearing:-12,maxPitch:70,minZoom:3,maxZoom:14,attributionControl:true,style:{version:8,sources:{japan:{type:'geojson',data:outline,attribution:'<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>'}},layers:[{id:'background',type:'background',paint:{'background-color':'#e8f0ed'}},{id:'country',type:'fill',source:'japan',paint:{'fill-color':'#f6f8f0'}},{id:'country-line',type:'line',source:'japan',paint:{'line-color':'#a2b7a8','line-width':0.7}}]}});
+    map=new maplibregl.Map({container:'map',bounds:JAPAN_BOUNDS,fitBoundsOptions:fitOptions(),maxBounds:PAN_BOUNDS,pitch:48,bearing:-12,maxPitch:70,minZoom:2,maxZoom:14,attributionControl:true,style:{version:8,sources:{gsi:{type:'raster',tiles:['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'],tileSize:256,maxzoom:18,attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>'},japan:{type:'geojson',data:outline,attribution:'<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>'}},layers:[{id:'background',type:'background',paint:{'background-color':'#e8f0ed'}},{id:'country',type:'fill',source:'japan',paint:{'fill-color':'#f6f8f0'}},{id:'gsi',type:'raster',source:'gsi',paint:{'raster-opacity':0.66,'raster-saturation':-0.55}},{id:'country-line',type:'line',source:'japan',paint:{'line-color':'#a2b7a8','line-width':0.7}}]}});
     mapTimeout=setTimeout(()=>{if(!mapReady)activateFallback();},16000);
     map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
     map.on('load',()=>{
@@ -111,10 +114,10 @@ function drawFallback(){
   host.replaceChildren(svg);const attribution=document.createElement('div');attribution.className='fallback-attribution';attribution.innerHTML='境界：<a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> · 小さい値は最小サイズ';host.append(attribution);
 }
 
-function focusRegion(){
+function focusRegion(duration=reduced?0:800){
   if(fallback){drawFallback();return;}if(!mapReady)return;
-  const positive=positiveVisible(),located=positive.length?positive:pool().filter(validCoordinate);if(!state.pref||!located.length){map.easeTo({center:[137.2,36.6],zoom:nationalZoom(),pitch:state.threeD?48:0,bearing:state.threeD?-12:0,duration:reduced?0:800});return;}
-  const bounds=new maplibregl.LngLatBounds();located.forEach(f=>bounds.extend([f.lon,f.lat]));map.fitBounds(bounds,{padding:{top:95,bottom:75,left:90,right:70},maxZoom:8.2,duration:reduced?0:800});
+  const positive=positiveVisible(),located=positive.length?positive:pool().filter(validCoordinate);if(!state.pref||!located.length){map.fitBounds(JAPAN_BOUNDS,fitOptions(duration));return;}
+  const bounds=new maplibregl.LngLatBounds();located.forEach(f=>bounds.extend([f.lon,f.lat]));map.fitBounds(bounds,{...fitOptions(duration),maxZoom:8.2});
 }
 
 function selectFacility(f,fly=true){state.selected=f;$('facility-detail').hidden=false;renderDetail();updateMap();if(fly&&validCoordinate(f)&&mapReady)map.flyTo({center:[f.lon,f.lat],zoom:Math.max(map.getZoom(),8.5),pitch:state.threeD?48:0,duration:reduced?0:900});}
@@ -144,7 +147,7 @@ function bind(){
   $('reset-map').addEventListener('click',()=>{state.pref='';$('pref').value='';render();focusRegion();});
   $('dimension').addEventListener('click',()=>{if(!mapReady)return;state.threeD=!state.threeD;$('dimension').textContent=state.threeD?'3D':'2D';$('dimension').setAttribute('aria-pressed',String(state.threeD));map.easeTo({pitch:state.threeD?48:0,bearing:state.threeD?-12:0,duration:reduced?0:600});map.setLayoutProperty('columns','visibility',state.threeD?'visible':'none');render();});
   $('about-button').addEventListener('click',()=>$('about-dialog').showModal());$('close-about').addEventListener('click',()=>$('about-dialog').close());$('about-dialog').addEventListener('click',event=>{if(event.target===$('about-dialog')){const r=$('about-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('about-dialog').close();}});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)setPlaying(false);});new ResizeObserver(()=>{if(fallback)drawFallback();else if(map)map.resize();}).observe($('map-stage')||document.querySelector('.map-stage'));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)setPlaying(false);});new ResizeObserver(()=>{if(fallback)drawFallback();else if(map){map.resize();if(mapReady&&!state.selected)focusRegion(0);}}).observe($('map-stage')||document.querySelector('.map-stage'));
 }
 
 async function boot(){

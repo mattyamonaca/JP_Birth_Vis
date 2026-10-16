@@ -39,10 +39,13 @@
 
 - [厚生労働省・病床機能報告](https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000055891.html)：分娩公表値。年ごとの原資料URLは `data/facilities.json` の `meta.sources` に収録。
 - [厚生労働省・医療情報ネットのオープンデータ](https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryou/newpage_43373.html)：施設座標・住所。
+- [国土地理院・地理院タイル](https://maps.gsi.go.jp/development/ichiran.html)：淡色地図。閲覧時に国土地理院から配信。
 - [Natural Earth](https://www.naturalearthdata.com/)：1:50mの日本概略境界。配布元は [natural-earth-vector](https://github.com/nvkelso/natural-earth-vector)。パブリックドメイン。
 - [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js/tree/v5.6.0)：5.6.0をローカル同梱。ライセンス全文は `assets/maplibre-LICENSE.txt`。
 
-アプリ・ライブラリ・境界・数値データは同一サイトから読み込みます。背景は同梱の日本概略境界のみで、日本以外の陸地・地名や道路地図は表示しません。概略境界のため細部の海岸線・小島は省略されています。施設の座標は境界とは別に保持します。外部地図タイル、JavaScript/CSSのCDN、外部Webフォントへの通信は行いません。
+背景は国土地理院の淡色地図です。初期表示・「全国へ」・都道府県の選択解除では北海道〜沖縄・先島諸島を含む日本全域を画面に合わせ、移動範囲は日本周辺に制限します。周辺国の一部も表示されます。
+
+アプリ・ライブラリ・境界・数値データは同一サイトから読み込みます。JavaScript/CSSのCDNや外部Webフォントに依存しません。背景タイルには外部通信が必要ですが、取得できない場合も同梱境界と施設表示を利用できます。
 
 ## ローカル確認
 
