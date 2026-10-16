@@ -1,0 +1,48 @@
+name: Deploy Birth Atlas to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check JavaScript and data
+        run: |
+          node --check app.mjs
+          node --check core.mjs
+          node scripts/check-core.mjs
+          python3 scripts/check-static.py
+      - name: Configure Pages
+        uses: actions/configure-pages@v6.0.0
+      - name: Prepare public files
+        run: |
+          mkdir _site
+          cp index.html app.mjs core.mjs style.css .nojekyll _site/
+          cp -R assets data _site/
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: _site
+          include-hidden-files: true
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5.0.1

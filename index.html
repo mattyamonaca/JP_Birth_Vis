@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="全国の病院・有床診療所の分娩公表値を、立体地図と年次再生で探索するデータアトラス。">
+  <meta name="theme-color" content="#102a32"><title>分娩の地理 — Birth Atlas</title>
+  <link rel="stylesheet" href="./assets/maplibre-gl.css"><link rel="stylesheet" href="./style.css">
+  <script defer src="./assets/maplibre-gl.js"></script><script type="module" src="./app.mjs"></script>
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="./" aria-label="Birth Atlas ホーム"><span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span><span>BIRTH <b>ATLAS</b></span></a>
+  <div class="header-description">分娩の地理<span>日本の施設別データ</span></div>
+  <button class="text-button" id="about-button" type="button">データと読み方 <span aria-hidden="true">↗</span></button>
+</header>
+<main class="workspace">
+  <aside class="sidebar" aria-label="表示条件と地域の集計">
+    <div class="sidebar-heading"><span class="eyebrow">JAPAN · MATERNITY CARE</span><h1>場所から見る、<br>分娩の変化。</h1><p>病院・有床診療所の公表値を、<br>地図と時間でたどる。</p></div>
+    <div class="filters">
+      <label for="pref">地域<span>都道府県</span></label><select id="pref"><option value="">全国</option></select>
+      <label for="type">施設種別</label><select id="type"><option value="">すべての対象施設</option><option value="hospital">病院</option><option value="clinic">有床診療所</option></select>
+      <label for="facility-search">施設を探す</label><input id="facility-search" type="search" placeholder="施設名を入力" autocomplete="off" aria-controls="search-results"><div id="search-results" class="search-results" aria-live="polite"></div>
+      <label class="check-row"><input id="include-quality" type="checkbox"><span>原報告の要確認値も含める</span></label>
+      <p class="micro muted">秘匿・未報告は常に除外します。</p>
+    </div>
+    <section class="region-summary" aria-label="地域の公表値集計">
+      <div class="section-kicker">SELECTED REGION</div><h2 id="region-name">全国</h2><div class="summary-label" id="sum-label">掲載施設の公表値合計</div>
+      <div class="big-number"><span id="region-total">—</span><span>件</span></div><p id="report-count" class="micro muted">データを読み込み中</p>
+      <div class="comparisons"><div><span id="previous-label">前年との比較</span><strong id="previous-change">—</strong><small id="previous-panel">比較可能 — 施設</small></div><div><span id="baseline-label">初年との比較</span><strong id="baseline-change">—</strong><small id="baseline-panel">比較可能 — 施設</small></div></div>
+      <p class="micro muted">増減は両年に数値がある同一施設で比較。地域全体の出生数ではありません。</p>
+    </section>
+    <div class="coverage"><span class="coverage-dot"></span><p id="coverage-label">座標の収録状況を確認中</p></div>
+    <button class="text-button sidebar-source" id="sources-button" type="button">集計方法・出典を見る ↗</button>
+  </aside>
+  <section class="map-workspace" aria-label="施設別分娩数の地図">
+    <div class="map-stage">
+      <div id="map" aria-label="分娩数を高さで表した3D日本地図"></div>
+      <div id="fallback-map" hidden aria-label="日本の施設別分娩数の2D地図"></div>
+      <div class="map-heading"><span id="period-kicker">ANNUAL DATA</span><div><strong id="map-year">2024</strong><span id="map-year-unit">年度</span></div><p id="map-period">2024年4月—2025年3月</p></div>
+      <div class="map-actions"><button id="reset-map" type="button">全国へ</button><button id="dimension" type="button" aria-pressed="true">3D</button></div>
+      <div class="map-legend"><span><i class="hospital-dot"></i>病院</span><span><i class="clinic-dot"></i>有床診療所</span><small id="map-scale">高さの倍率は全年度で固定</small></div>
+      <div id="map-message" class="map-message" role="status" hidden></div>
+      <div id="loading" class="loading-state"><span class="spinner"></span><strong>全国の分娩データを読み込んでいます</strong></div>
+      <div class="map-bottom-label"><span id="map-count">—</span><span>位置は2026年の公表座標。過去の移転は未追跡。</span></div>
+      <section id="facility-detail" class="facility-detail" aria-label="選択施設の詳細" hidden>
+        <button id="close-detail" class="close-button" type="button" aria-label="施設詳細を閉じる">×</button>
+        <div id="detail-type" class="section-kicker"></div><h2 id="detail-name"></h2><p id="detail-address" class="micro muted"></p><div class="detail-value"><strong id="detail-value">—</strong><span id="detail-unit">件</span></div><p id="detail-status" class="micro"></p>
+        <div id="detail-chart" aria-label="選択施設の分娩数推移"></div><div id="detail-years" class="detail-years"></div><p id="detail-location" class="micro muted"></p><div id="colocated"></div>
+      </section>
+    </div>
+    <section class="timeline" aria-label="時期と再生の操作">
+      <div class="timeline-top"><div class="mode-tabs" role="group" aria-label="集計期間"><button data-mode="annual" type="button" aria-pressed="true">年間 <small>2020–24</small></button><button data-mode="monthly" type="button" aria-pressed="false">6月単月 <small>2016–20</small></button></div><span id="timeline-note">年間と単月は別の尺度で表示</span></div>
+      <div class="playback"><button id="play" class="play-button" type="button" aria-label="年次変化を再生"><span id="play-icon" aria-hidden="true">▶</span><span id="play-label">再生</span></button><div class="range-wrap"><input id="year-range" type="range" min="0" max="4" value="4" step="1" aria-label="表示年度"><div id="year-ticks" class="year-ticks"></div></div></div>
+    </section>
+  </section>
+</main>
+<dialog id="about-dialog"><div class="dialog-head"><span class="eyebrow">DATA & METHODOLOGY</span><button id="close-about" class="close-button" type="button" aria-label="説明を閉じる">×</button></div><h2>この地図の読み方</h2>
+  <p>1本の棒が1施設。高さは選択した年の分娩件数です。年を動かしても高さの倍率は変わりません。棒の底面幅は見やすさのためズームに応じて変わります。</p>
+  <h3>何を集計しているか</h3><p>厚生労働省の病床機能報告から、病院は病棟の公表値を合算し、有床診療所は施設の報告値を使っています。正常分娩・帝王切開を含み、死産を除きます。助産所・無床診療所・未掲載施設は含みません。</p>
+  <p>年間は2020〜2024年度（各4月〜翌3月）、旧年は2016〜2020年の各6月の1か月分です。単月値を年換算したり、年間と接続したりしません。</p>
+  <h3>秘匿・品質・比較</h3><p>秘匿や未報告はゼロとして扱わず、棒・集計・前年比から除外します。病棟に同じ数値が繰り返される値や大きな報告値には「原報告要確認」の印があり、初期状態では除外します。表示に含めても原値は補正しません。</p>
+  <p>前年・初年との差は、両年に公表数値があり、同じ品質条件を満たす施設だけで計算します。比較可能な施設数は組み合わせごとに異なります。座標未取得施設も地域の数値集計には含みます。</p>
+  <h3>位置と施設のつながり</h3><p>位置は医療情報ネットの2026年6月1日時点の公表座標です。過去の移転は追跡していません。施設種別と報告コードで年をつないでおり、コード変更・統廃合・病院と診療所の転換は追加名寄せしていません。位置を特定できない施設を都道府県の中心等に置くことはありません。</p>
+  <h3>出典</h3><ul class="source-links"><li><a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000055891.html" target="_blank" rel="noopener">厚生労働省・病床機能報告</a></li><li><a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryou/newpage_43373.html" target="_blank" rel="noopener">医療情報ネット・オープンデータ</a></li><li><a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院・地理院タイル（淡色地図）</a></li><li><a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth・日本の概略境界</a></li></ul><p class="micro muted">数値取得日：2026年10月16日。棒は建物の実際の高さを表しません。</p>
+</dialog>
+<noscript><p class="noscript-message">地図と年次操作にはJavaScriptが必要です。ブラウザでJavaScriptを有効にしてください。</p></noscript>
+</body></html>
